@@ -18,11 +18,7 @@
  */
 package com.l2jserver.loginserver.network.gameserverpackets;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
-import java.security.MessageDigest;
 import java.sql.ResultSet;
-import java.util.Base64;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +28,7 @@ import com.l2jserver.commons.network.BaseRecievePacket;
 import com.l2jserver.loginserver.GameServerTable;
 import com.l2jserver.loginserver.GameServerTable.GameServerInfo;
 import com.l2jserver.loginserver.GameServerThread;
+import com.l2jserver.loginserver.util.SHA256;
 
 /**
  * Change Password packet.
@@ -66,9 +63,6 @@ public class ChangePassword extends BaseRecievePacket {
 			gst.ChangePasswordResponse((byte) 0, characterName, "Invalid password data! Try again.");
 		} else {
 			try {
-				final var md = MessageDigest.getInstance("SHA");
-				final var raw = md.digest(curpass.getBytes(UTF_8));
-				String curpassEnc = Base64.getEncoder().encodeToString(raw);
 				String pass = null;
 				int passUpdated;
 				
@@ -82,9 +76,8 @@ public class ChangePassword extends BaseRecievePacket {
 					}
 				}
 				
-				if (curpassEnc.equals(pass)) {
-					final var password = md.digest(newpass.getBytes(UTF_8));
-					final var newPasswordEnc = Base64.getEncoder().encodeToString(password);
+				if (SHA256.validatePassword(curpass, pass)) {
+					final var newPasswordEnc = SHA256.getPasswordHash(newpass);
 					try (var con = ConnectionFactory.getInstance().getConnection();
 						var ps = con.prepareStatement("UPDATE accounts SET password=? WHERE login=?")) {
 						ps.setString(1, newPasswordEnc);
@@ -92,7 +85,7 @@ public class ChangePassword extends BaseRecievePacket {
 						passUpdated = ps.executeUpdate();
 					}
 					
-					LOG.info("The password for account {} has been changed from {} to {}.", accountName, curpassEnc, newPasswordEnc);
+					LOG.info("The password for account {} has been changed from {} to {}.", accountName, pass, newPasswordEnc);
 					if (passUpdated > 0) {
 						gst.ChangePasswordResponse((byte) 1, characterName, "You have successfully changed your password!");
 					} else {

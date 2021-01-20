@@ -19,17 +19,14 @@
 package com.l2jserver.loginserver;
 
 import static com.l2jserver.loginserver.config.Configuration.server;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.security.spec.RSAKeyGenParameterSpec.F4;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.security.KeyPairGenerator;
-import java.security.MessageDigest;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.spec.RSAKeyGenParameterSpec;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +45,7 @@ import com.l2jserver.loginserver.network.L2LoginClient;
 import com.l2jserver.loginserver.network.gameserverpackets.ServerStatus;
 import com.l2jserver.loginserver.network.serverpackets.LoginFail.LoginFailReason;
 import com.l2jserver.loginserver.security.ScrambledKeyPair;
+import com.l2jserver.loginserver.util.SHA256;
 
 /**
  * Login Controller.
@@ -176,9 +174,7 @@ public class LoginController {
 	
 	private AccountInfo retrieveAccountInfo(InetAddress addr, String login, String password, boolean autoCreateIfEnabled) {
 		try {
-			final var md = MessageDigest.getInstance("SHA");
-			final var raw = password.getBytes(UTF_8);
-			final var hashBase64 = Base64.getEncoder().encodeToString(md.digest(raw));
+			final var hashBase64 = SHA256.getPasswordHash(password);
 			
 			try (var con = ConnectionFactory.getInstance().getConnection();
 				var ps = con.prepareStatement(USER_INFO_SELECT)) {
@@ -191,7 +187,7 @@ public class LoginController {
 						}
 						
 						final var info = new AccountInfo(rs.getString("login"), rs.getString("password"), rs.getInt("accessLevel"), rs.getInt("lastServer"));
-						if (!info.checkPassHash(hashBase64)) {
+						if (!SHA256.validatePassword(password, info.getPassHash())) {
 							recordFailedLoginAttempt(addr);
 							return null;
 						}

@@ -48,8 +48,8 @@ public final class AccountInfo {
 		_lastServer = lastServer;
 	}
 	
-	public boolean checkPassHash(final String passHash) {
-		return _passHash.equals(passHash);
+	public String getPassHash() {
+		return _passHash;
 	}
 	
 	public String getLogin() {
